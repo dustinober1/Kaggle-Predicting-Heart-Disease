@@ -147,7 +147,51 @@ The LLM experiments use a Q4-quantized 20B parameter model (11GB) via Ollama.
 
 ## 5.1 Exploratory Data Analysis
 
-*[To be completed after Phase 1.]*
+### 5.1.1 Dataset Characteristics
+
+The training set contains 630,000 instances with no missing values and no duplicate feature rows.
+The target distribution is mildly imbalanced: 55.2% Absence (347,546) vs 44.8% Presence (282,454),
+yielding an imbalance ratio of 1.23:1. This modest imbalance does not necessitate aggressive
+resampling as a primary strategy, though we evaluate its impact systematically in Section 5.7.
+
+A Kolmogorov-Smirnov test comparing train and test feature distributions showed no statistically
+significant drift for any feature (all p > 0.05), confirming that the synthetic generation process
+maintained distributional consistency across splits.
+
+### 5.1.2 Feature Informativeness
+
+**Mutual Information Rankings** (features vs. target, descending):
+
+| Rank | Feature | MI Score | Cramér's V / Effect |
+|---|---|---|---|
+| 1 | Thallium | 0.2358 | V=0.606 (strong) |
+| 2 | Chest pain type | 0.1895 | V=0.525 (strong) |
+| 3 | Sex | 0.1318 | V=0.342 (moderate) |
+| 4 | Max HR | 0.1293 | MWU p<0.001 |
+| 5 | Slope of ST | 0.1250 | V=0.430 (strong) |
+| 6 | Exercise angina | 0.1239 | V=0.442 (strong) |
+| 7 | Number of vessels fluro | 0.1206 | V=0.463 (strong) |
+| 8 | ST depression | 0.1082 | MWU p<0.001 |
+| 9 | EKG results | 0.0751 | V=0.219 (moderate) |
+| 10 | Age | 0.0299 | MWU p<0.001 |
+| 11 | Cholesterol | 0.0120 | MWU p<0.001 |
+| 12 | BP | 0.0110 | MWU p=0.503 (n.s.) |
+| 13 | FBS over 120 | 0.0022 | V=0.034 (negligible) |
+
+**Key finding**: Blood pressure (BP) showed no statistically significant difference between classes
+(Mann-Whitney U, p=0.503), making it the weakest predictor despite its clinical relevance.
+FBS over 120 (fasting blood sugar) also showed negligible association (MI=0.002, Cramér's V=0.034).
+
+### 5.1.3 Clinical Interpretation
+
+- **Thallium stress test** (MI=0.236, V=0.606): The strongest single predictor. Normal thallium
+  (value 3) strongly favors Absence; fixed defect (6) and reversible defect (7) strongly favor Presence.
+- **Chest pain type** (MI=0.189, V=0.525): Counter-intuitively, Type 4 (asymptomatic) is most
+  associated with Presence — a well-known clinical paradox where silent ischemia carries high risk.
+- **Max HR** (MI=0.129): Lower maximum heart rate during exercise is associated with Presence,
+  reflecting reduced cardiovascular fitness in diseased patients.
+- **Exercise angina** (V=0.442): A direct symptom of ischemia; strongly associated with Presence.
+- **Number of vessels colored by fluoroscopy** (V=0.463): More vessels with disease → higher Presence rate.
 
 ## 5.2 Baseline Models
 

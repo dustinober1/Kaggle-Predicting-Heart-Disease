@@ -1,0 +1,41 @@
+{
+  "train_samples": 630000,
+  "test_samples": 270000,
+  "n_features": 13,
+  "target_absence_pct": 55.16603174603174,
+  "target_presence_pct": 44.83396825396825,
+  "imbalance_ratio": 1.2304516841680415,
+  "duplicate_rows": 0,
+  "mi_rankings": {
+    "Thallium": 0.2358328010492312,
+    "Chest pain type": 0.1894546707042326,
+    "Sex": 0.1317759298919392,
+    "Max HR": 0.12933960562986102,
+    "Slope of ST": 0.12504763797746166,
+    "Exercise angina": 0.12391605993793142,
+    "Number of vessels fluro": 0.12062244880205641,
+    "ST depression": 0.10822063255402603,
+    "EKG results": 0.07514932541213892,
+    "Age": 0.02990387431958319,
+    "Cholesterol": 0.012045448299039974,
+    "BP": 0.011034291403417162,
+    "FBS over 120": 0.00219190031912353
+  },
+  "mwu_p_values": {
+    "Age": 0.0,
+    "BP": 0.5031075778945167,
+    "Cholesterol": 0.0,
+    "Max HR": 0.0,
+    "ST depression": 0.0
+  },
+  "chi2_cramers_v": {
+    "Sex": 0.3424427248752851,
+    "FBS over 120": 0.03356439421963458,
+    "Exercise angina": 0.4418601522831755,
+    "Chest pain type": 0.5251918193257413,
+    "EKG results": 0.2191195086146993,
+    "Slope of ST": 0.4297610620505979,
+    "Number of vessels fluro": 0.46323657476195707,
+    "Thallium": 0.6058127058350007
+  }
+}

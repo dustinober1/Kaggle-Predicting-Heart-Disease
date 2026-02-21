@@ -1,0 +1,66 @@
+{
+  "rf_selected_features": [
+    "Chest pain type",
+    "Cholesterol",
+    "Max HR",
+    "ST depression",
+    "Number of vessels fluro",
+    "Thallium"
+  ],
+  "mi_top10_features": [
+    "Age",
+    "Sex",
+    "Chest pain type",
+    "EKG results",
+    "Max HR",
+    "Exercise angina",
+    "ST depression",
+    "Slope of ST",
+    "Number of vessels fluro",
+    "Thallium"
+  ],
+  "pca_n_components_95pct": 12,
+  "pca_n_components_99pct": 13,
+  "high_corr_pairs": [],
+  "feature_set_dims": {
+    "baseline": 13,
+    "scaled": 13,
+    "robust": 13,
+    "engineered": 18,
+    "pca": 12,
+    "selected": 6
+  },
+  "feature_set_logreg_auc": {
+    "baseline": {
+      "mean": 0.9497840165453614,
+      "std": 0.00037061346417287494
+    },
+    "scaled": {
+      "mean": 0.950492052699949,
+      "std": 0.00010355653391854247
+    },
+    "robust": {
+      "mean": 0.9504921872568332,
+      "std": 0.00010407420586104713
+    },
+    "engineered": {
+      "mean": 0.9505820345182764,
+      "std": 0.0001267435230243971
+    },
+    "pca": {
+      "mean": 0.950492172161125,
+      "std": 0.00010352834603381474
+    },
+    "selected": {
+      "mean": 0.9350178879080678,
+      "std": 2.8390709619117225e-05
+    }
+  },
+  "engineered_features": [
+    "Age_HR_ratio",
+    "BP_Chol_product",
+    "ST_Slope_interaction",
+    "High_risk_age",
+    "ST_abs"
+  ]
+}
