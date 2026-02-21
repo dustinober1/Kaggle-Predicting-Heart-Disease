@@ -1,0 +1,5 @@
+# MLflow tracking configuration
+# This file is read by mlflow automatically when present
+[mlflow]
+tracking_uri = file:./mlruns
+experiment_name = Heart-Disease-Kaggle

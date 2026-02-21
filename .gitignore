@@ -1,0 +1,92 @@
+# ─── Virtual Environment ──────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+
+# ─── Jupyter ──────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.nbconvert/
+profile_default/
+ipython_config.py
+
+# ─── Python Cache ─────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ─── Large / Derived Model Files (avoid git-lfs) ──────────────────────────────
+results/models/
+*.pkl
+*.pickle
+*.joblib
+*.pt
+*.pth
+*.onnx
+*.bin
+*.safetensors
+
+# ─── Intermediate / Derived Data ─────────────────────────────────────────────
+*.parquet
+*.feather
+*.arrow
+*.h5
+*.hdf5
+data/processed/
+data/interim/
+data/external/
+
+# ─── MLflow experiment tracking (local only, re-generatable) ─────────────────
+mlruns/
+mlartifacts/
+
+# ─── Optuna search history (local only, re-generatable) ──────────────────────
+results/optuna.db
+results/optuna.db-journal
+
+# ─── macOS ────────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+# ─── Editor ───────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── Environment / Secrets ────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+secrets.yml
+
+# ─── Testing / Coverage ───────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# ─── pyenv version file (local, not project-wide) ────────────────────────────
+# .python-version  ← commented out: we DO want to commit this for reproducibility
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── Temporary / Scratch ──────────────────────────────────────────────────────
+scratch/
+tmp/
+temp/
