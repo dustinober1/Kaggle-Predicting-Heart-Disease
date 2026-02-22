@@ -1,0 +1,49 @@
+{
+  "model": "qwen3:0.6b",
+  "n_samples": 200,
+  "zero_shot": {
+    "accuracy": 0.5,
+    "f1": 0.0,
+    "recall": 0.0
+  },
+  "few_shot_5": {
+    "accuracy": 0.5,
+    "f1": 0.0,
+    "recall": 0.0
+  },
+  "chain_of_thought": {
+    "n_samples": 50,
+    "accuracy": 0.5,
+    "f1": 0.0,
+    "recall": 0.0
+  },
+  "risk_score_feature": {
+    "correlation_with_target": NaN,
+    "ml_auc_without_llm": 0.5,
+    "ml_auc_with_llm_score": 0.5
+  },
+  "edge_cases": {
+    "n_cases": 10,
+    "accuracy": 0.4,
+    "examples": [
+      {
+        "true_label": 1,
+        "ml_prob": 0.5007218677271034,
+        "llm_pred": 0,
+        "llm_response": ""
+      },
+      {
+        "true_label": 1,
+        "ml_prob": 0.48874920968313373,
+        "llm_pred": 0,
+        "llm_response": ""
+      },
+      {
+        "true_label": 0,
+        "ml_prob": 0.5243925987819803,
+        "llm_pred": 0,
+        "llm_response": ""
+      }
+    ]
+  }
+}
