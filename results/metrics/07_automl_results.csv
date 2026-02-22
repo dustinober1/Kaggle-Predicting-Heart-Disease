@@ -1,0 +1,8 @@
+model,phase,roc_auc_mean,roc_auc_std,f1_mean,f1_std,recall_mean,recall_std,notes
+FLAML_300s,automl,0.9552954099673056,0.0,0.0,0.0,0.0,0.0,"lgbm, 379s"
+FLAML_600s,automl,0.9552954099673056,0.0,0.0,0.0,0.0,0.0,"lgbm, 602s"
+LightGBM_Optuna_TPE_200,automl,0.955446737513447,0.0004273291739191137,0.0,0.0,0.0,0.0,"TPE, 349s"
+LightGBM_Optuna_CMAES_100,automl,0.9546118477805802,0.0003982131921768089,0.0,0.0,0.0,0.0,"CMA-ES, 303s"
+LGB_ablation_raw_13,ablation,0.9554455957279714,0.0004329202428863533,0.0,0.0,0.0,0.0,"ablation, 13 features"
+LGB_ablation_scaled_13,ablation,0.955446737513447,0.0004273291739191137,0.0,0.0,0.0,0.0,"ablation, 13 features"
+LGB_ablation_engineered_18,ablation,0.9553599412507829,0.00046681500408360827,0.0,0.0,0.0,0.0,"ablation, 18 features"
