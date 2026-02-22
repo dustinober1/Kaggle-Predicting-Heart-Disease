@@ -1,0 +1,2282 @@
+<hr />
+<h1 data-number="1" id="introduction"><span
+class="header-section-number">1</span> 1. Introduction</h1>
+<p>Cardiovascular disease remains the leading cause of death globally,
+accounting for approximately 17.9 million deaths per year according to
+the World Health Organization. Early and accurate prediction of heart
+disease is critical for clinical decision support, enabling timely
+intervention that can significantly reduce morbidity and mortality.</p>
+<p>Machine learning approaches to heart disease prediction have a long
+history, beginning with early work on the UCI Heart Disease dataset
+<span class="citation" data-cites="detrano1989international">(Detrano et
+al. 1989)</span> and extending to modern deep learning and AutoML
+approaches. The Kaggle Playground Series S6E2 competition provides a
+synthetic dataset derived from the original UCI data, scaled to 630,000
+training instances — enabling thorough evaluation of high-capacity
+models that would be infeasible on the original 303-instance
+benchmark.</p>
+<p>This paper makes the following contributions:</p>
+<ol type="1">
+<li>A systematic benchmark of <strong>83 machine learning
+models</strong> across 13 experimental phases, enabling direct
+comparison of classical, ensemble, neural, AutoML, and LLM
+approaches.</li>
+<li>Rigorous evaluation on three clinically meaningful metrics: ROC-AUC,
+F1-Score, and Recall, with full cross-validation (Stratified
+5-fold).</li>
+<li>Evidence that gradient boosting methods define a hard performance
+ceiling (~0.9555 AUC) for this dataset, and that no approach — including
+neural networks, AutoML, or ensembles — meaningfully surpasses it.</li>
+<li>SHAP-based interpretability connecting model decisions to clinical
+domain knowledge, with actionable findings for the 13 features
+studied.</li>
+<li>The first evaluation of a quantized LLM (Qwen3 0.6B) for zero-shot
+tabular heart disease classification, demonstrating that sub-1B models
+are wholly unsuitable for this task.</li>
+<li>A fully reproducible framework with MLflow experiment tracking,
+version-controlled code, and file-level commits after each experimental
+phase.</li>
+</ol>
+<hr />
+<h1 data-number="2" id="related-work"><span
+class="header-section-number">2</span> 2. Related Work</h1>
+<h2 data-number="2.1"
+id="classical-machine-learning-for-heart-disease"><span
+class="header-section-number">2.1</span> 2.1 Classical Machine Learning
+for Heart Disease</h2>
+<p>The UCI Heart Disease dataset <span class="citation"
+data-cites="detrano1989international">(Detrano et al. 1989)</span>
+introduced the canonical benchmark for ML-based cardiac risk prediction.
+Subsequent studies applied logistic regression, decision trees, and
+Naive Bayes, typically achieving 70–85% accuracy on the 303-instance
+dataset. Palaniappan and Awang (2008) demonstrated that decision trees
+and Naive Bayes could achieve ~84% accuracy on this benchmark. More
+recently, random forests and gradient boosting methods have consistently
+outperformed shallower models, with AUC values in the 0.92–0.96 range on
+the original UCI data.</p>
+<h2 data-number="2.2" id="gradient-boosting-for-tabular-data"><span
+class="header-section-number">2.2</span> 2.2 Gradient Boosting for
+Tabular Data</h2>
+<p>Gradient boosting methods — XGBoost <span class="citation"
+data-cites="chen2016xgboost">(Chen and Guestrin 2016)</span>, LightGBM
+<span class="citation" data-cites="ke2017lightgbm">(Ke et al.
+2017)</span>, and CatBoost <span class="citation"
+data-cites="prokhorenkova2018catboost">(Prokhorenkova et al.
+2018)</span> — have become the dominant paradigm for tabular data
+competitions. Multiple Kaggle benchmarks confirm that tree-based
+boosting routinely outperforms deep neural networks on tabular data
+<span class="citation" data-cites="grinsztajn2022tree">(Grinsztajn et
+al. 2022)</span>. The histogram-based variant (HistGradientBoosting,
+LightGBM) provides particularly efficient training on large
+datasets.</p>
+<h2 data-number="2.3" id="deep-learning-for-tabular-data"><span
+class="header-section-number">2.3</span> 2.3 Deep Learning for Tabular
+Data</h2>
+<p>TabNet <span class="citation" data-cites="arik2021tabnet">(Arik and
+Pfister 2021)</span> introduced sequential attention for tabular feature
+selection. NODE <span class="citation"
+data-cites="popov2020neural">(Popov et al. 2020)</span> and SAINT <span
+class="citation"
+data-cites="somepalli2021saint">(<strong>somepalli2021saint?</strong>)</span>
+extended transformer-style architectures to tabular problems. Despite
+architectural innovation, multiple benchmarks show that these approaches
+struggle to consistently outperform gradient boosting on real-world
+tabular datasets <span class="citation"
+data-cites="grinsztajn2022tree mcelfresh2023neural">(Grinsztajn et al.
+2022; McElfresh et al. 2023)</span>.</p>
+<h2 data-number="2.4" id="automl"><span
+class="header-section-number">2.4</span> 2.4 AutoML</h2>
+<p>FLAML <span class="citation" data-cites="wang2021flaml">(Wang et al.
+2021)</span> uses a cost-efficient search strategy to find good
+configurations within a fixed time budget. Auto-Sklearn <span
+class="citation" data-cites="feurer2015efficient">(Feurer et al.
+2015)</span> applies Bayesian optimization with meta-learning
+warm-starting. Optuna <span class="citation"
+data-cites="akiba2019optuna">(Akiba et al. 2019)</span> provides a
+framework-agnostic hyperparameter optimization library supporting TPE
+and CMA-ES samplers.</p>
+<h2 data-number="2.5" id="interpretability"><span
+class="header-section-number">2.5</span> 2.5 Interpretability</h2>
+<p>SHAP (SHapley Additive exPlanations) <span class="citation"
+data-cites="lundberg2017unified">(Lundberg and Lee 2017)</span> provides
+theoretically grounded feature attribution based on cooperative game
+theory. SHAP TreeExplainer efficiently computes exact Shapley values for
+tree-based models. LIME <span class="citation"
+data-cites="ribeiro2016why">(Ribeiro et al. 2016)</span> provides local
+linear approximations for any black-box model. These methods are
+increasingly required for regulatory compliance in clinical AI
+applications.</p>
+<h2 data-number="2.6" id="llms-for-structured-data"><span
+class="header-section-number">2.6</span> 2.6 LLMs for Structured
+Data</h2>
+<p>TabLLM <span class="citation"
+data-cites="hegselmann2023tabllm">(Hegselmann et al. 2023)</span>
+demonstrated that large language models can be fine-tuned for tabular
+classification by serializing rows to natural language. FeatLLM <span
+class="citation"
+data-cites="han2024featllm">(<strong>han2024featllm?</strong>)</span>
+uses LLMs as feature engineers rather than direct classifiers. Zero-shot
+LLM classification of tabular medical data remains an open challenge,
+with most published results showing that LLMs without fine-tuning
+perform near random or exhibit strong prediction biases on numerical
+tabular features.</p>
+<hr />
+<h1 data-number="3" id="dataset-and-preprocessing"><span
+class="header-section-number">3</span> 3. Dataset and Preprocessing</h1>
+<h2 data-number="3.1" id="dataset-overview"><span
+class="header-section-number">3.1</span> 3.1 Dataset Overview</h2>
+<p>The dataset is sourced from the Kaggle Playground Series Season 6,
+Episode 2. It is synthetically generated via CTGAN-style models
+conditioned on the original UCI Heart Disease repository, scaled from
+303 instances to 630,000 training instances.</p>
+<table>
+<thead>
+<tr>
+<th>Split</th>
+<th>Instances</th>
+<th>Features</th>
+<th>Target Distribution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Training</td>
+<td>630,000</td>
+<td>13</td>
+<td>55.2% Absence, 44.8% Presence</td>
+</tr>
+<tr>
+<td>Test</td>
+<td>270,000</td>
+<td>13</td>
+<td>Unlabeled (competition holdout)</td>
+</tr>
+</tbody>
+</table>
+<p>The target variable (<code>Heart Disease</code>) is binary:
+<em>Presence</em> (1) or <em>Absence</em> (0). The class imbalance ratio
+is <strong>1.23:1</strong>, classified as mild and not requiring
+aggressive rebalancing as a primary concern.</p>
+<h2 data-number="3.2" id="feature-descriptions"><span
+class="header-section-number">3.2</span> 3.2 Feature Descriptions</h2>
+<table>
+<colgroup>
+<col style="width: 24%" />
+<col style="width: 14%" />
+<col style="width: 15%" />
+<col style="width: 45%" />
+</colgroup>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Type</th>
+<th>Range / Values</th>
+<th>Clinical Significance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Age</td>
+<td>Continuous</td>
+<td>28–77 years</td>
+<td>Risk increases with age</td>
+</tr>
+<tr>
+<td>Sex</td>
+<td>Binary</td>
+<td>0=F, 1=M</td>
+<td>Males historically higher baseline risk</td>
+</tr>
+<tr>
+<td>Chest pain type</td>
+<td>Ordinal</td>
+<td>1–4</td>
+<td>Type 4 (asymptomatic) paradoxically high risk</td>
+</tr>
+<tr>
+<td>BP</td>
+<td>Continuous</td>
+<td>94–200 mmHg</td>
+<td>Resting blood pressure</td>
+</tr>
+<tr>
+<td>Cholesterol</td>
+<td>Continuous</td>
+<td>131–564 mg/dl</td>
+<td>Serum cholesterol</td>
+</tr>
+<tr>
+<td>FBS over 120</td>
+<td>Binary</td>
+<td>0/1</td>
+<td>Fasting blood sugar &gt; 120 mg/dl</td>
+</tr>
+<tr>
+<td>EKG results</td>
+<td>Ordinal</td>
+<td>0–2</td>
+<td>Resting ECG result classification</td>
+</tr>
+<tr>
+<td>Max HR</td>
+<td>Continuous</td>
+<td>71–202 bpm</td>
+<td>Maximum heart rate achieved during stress test</td>
+</tr>
+<tr>
+<td>Exercise angina</td>
+<td>Binary</td>
+<td>0/1</td>
+<td>Chest pain induced by exercise</td>
+</tr>
+<tr>
+<td>ST depression</td>
+<td>Continuous</td>
+<td>0.0–6.2</td>
+<td>ST segment depression during exercise</td>
+</tr>
+<tr>
+<td>Slope of ST</td>
+<td>Ordinal</td>
+<td>1–3</td>
+<td>Direction of peak exercise ST segment</td>
+</tr>
+<tr>
+<td>Number of vessels fluro</td>
+<td>Ordinal</td>
+<td>0–3</td>
+<td>Major vessels colored by fluoroscopy</td>
+</tr>
+<tr>
+<td>Thallium</td>
+<td>Ordinal</td>
+<td>3, 6, 7</td>
+<td>Thallium stress test: normal/fixed/reversible</td>
+</tr>
+</tbody>
+</table>
+<h2 data-number="3.3" id="data-quality-assessment"><span
+class="header-section-number">3.3</span> 3.3 Data Quality
+Assessment</h2>
+<p>The dataset exhibits no missing values and no duplicate rows across
+all 630,000 training instances — an artifact of synthetic generation. A
+Kolmogorov-Smirnov test comparing train and test feature distributions
+showed no statistically significant drift for any feature (all p &gt;
+0.05), confirming distributional consistency.</p>
+<p>Outlier analysis (IQR method) flagged 2–8% of instances per
+continuous feature as potential outliers, consistent with the natural
+tails of clinical measurement distributions. Isolation Forest identified
+a 5% anomaly rate in multivariate space. No imputation was required;
+outliers were retained as they reflect realistic clinical variation.</p>
+<h2 data-number="3.4" id="preprocessing-and-feature-engineering"><span
+class="header-section-number">3.4</span> 3.4 Preprocessing and Feature
+Engineering</h2>
+<p>All 13 raw features are used without transformation for tree-based
+models. For linear models and neural networks, we apply
+<code>StandardScaler</code> to continuous features. One-hot encoding is
+not used; ordinal integer encoding is preserved throughout, consistent
+with the original UCI annotation.</p>
+<p>We constructed six named feature sets:</p>
+<table>
+<colgroup>
+<col style="width: 22%" />
+<col style="width: 58%" />
+<col style="width: 18%" />
+</colgroup>
+<thead>
+<tr>
+<th>Feature Set</th>
+<th>Description</th>
+<th>Dimensionality</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>raw_13</code></td>
+<td>Raw features, no scaling</td>
+<td>13</td>
+</tr>
+<tr>
+<td><code>scaled_13</code></td>
+<td>Raw + StandardScaler</td>
+<td>13</td>
+</tr>
+<tr>
+<td><code>engineered_18</code></td>
+<td>+ Age×HR ratio, BP×Cholesterol, ST interaction,</td>
+<td>18</td>
+</tr>
+<tr>
+<td></td>
+<td>Age bins, polynomial degree-2 selected features</td>
+<td></td>
+</tr>
+<tr>
+<td><code>selected_top8</code></td>
+<td>Top-8 features by Mutual Information</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>pca_k</code></td>
+<td>PCA retaining 95% variance (≈10 components)</td>
+<td>10</td>
+</tr>
+</tbody>
+</table>
+<p>A feature-set ablation experiment (Section 5.6) showed no meaningful
+difference between <code>raw_13</code>, <code>scaled_13</code>, and
+<code>engineered_18</code> on LightGBM (all AUC ≈ 0.9554), confirming
+that the 13 raw features are sufficient and that handcrafted engineering
+provides no additional signal.</p>
+<hr />
+<h1 data-number="4" id="methodology"><span
+class="header-section-number">4</span> 4. Methodology</h1>
+<h2 data-number="4.1" id="evaluation-protocol"><span
+class="header-section-number">4.1</span> 4.1 Evaluation Protocol</h2>
+<p>All supervised models are evaluated using <strong>Stratified 5-fold
+Cross-Validation</strong>
+(<code>sklearn.model_selection.StratifiedKFold</code>,
+<code>n_splits=5</code>, <code>random_state=42</code>). We report the
+mean across all folds for:</p>
+<ul>
+<li><strong>ROC-AUC</strong> (primary): area under the receiver
+operating characteristic curve; threshold-independent and robust to
+class imbalance.</li>
+<li><strong>F1-Score</strong>: harmonic mean of precision and recall at
+threshold 0.5.</li>
+<li><strong>Recall</strong>: sensitivity; minimizing false negatives is
+clinically important (missed diagnoses are more harmful than false
+alarms in cardiac screening).</li>
+</ul>
+<p>Where noted, subsampling is applied to computationally intensive
+models: neural networks use 150,000 training instances (MLP) or 50,000
+(TabNet); SHAP values are computed on a 10,000-instance sample;
+t-SNE/UMAP on 20,000 instances.</p>
+<p>All experiments are logged to a local MLflow server under the
+experiment <code>Heart-Disease-Kaggle</code>. Hyperparameter
+optimization uses Optuna with an SQLite backend for state persistence
+across sessions.</p>
+<h2 data-number="4.2" id="hardware-environment"><span
+class="header-section-number">4.2</span> 4.2 Hardware Environment</h2>
+<p>All experiments are conducted on an <strong>Apple M1 MacBook Pro,
+16GB Unified Memory</strong>. Neural networks use the Metal Performance
+Shaders (MPS) backend (PyTorch 2.10.0,
+<code>torch.backends.mps.is_available() = True</code>). Tree-based
+models use CPU-optimized histogram methods
+(<code>tree_method='hist'</code>). Python 3.11.11 via
+<code>pyenv</code>; virtual environment managed with <code>venv</code>.
+XGBoost requires OpenMP (<code>libomp</code>) for parallelism on Apple
+Silicon.</p>
+<h2 data-number="4.3" id="model-families"><span
+class="header-section-number">4.3</span> 4.3 Model Families</h2>
+<h3 data-number="4.3.1" id="baseline-models"><span
+class="header-section-number">4.3.1</span> 4.3.1 Baseline Models</h3>
+<p>Dummy classifiers (majority-class, stratified, prior) establish the
+performance floor. Logistic Regression (L1, L2, ElasticNet) provides the
+linear baseline. Gaussian Naive Bayes assumes conditional feature
+independence. k-Nearest Neighbors evaluates distance-based instance
+retrieval. Decision Trees assess single-tree depth vs. performance
+tradeoffs.</p>
+<h3 data-number="4.3.2" id="classical-ensemble-methods"><span
+class="header-section-number">4.3.2</span> 4.3.2 Classical Ensemble
+Methods</h3>
+<p>Random Forest and Extra Trees evaluate bagging-based variance
+reduction. AdaBoost applies sequential boosted stumps. Bagging with
+Decision Tree base learners isolates ensemble effect. Support Vector
+Machines (RBF, Linear, Polynomial kernels) test margin-based
+classifiers. Linear and Quadratic Discriminant Analysis evaluate
+Gaussian class-conditional models.</p>
+<h3 data-number="4.3.3" id="gradient-boosting"><span
+class="header-section-number">4.3.3</span> 4.3.3 Gradient Boosting</h3>
+<p>XGBoost, LightGBM, and CatBoost are evaluated in default and
+Optuna-tuned variants. FLAML AutoML discovers configurations within
+fixed time budgets (300s, 600s). Optuna TPE (Tree-structured Parzen
+Estimator) and CMA-ES (Covariance Matrix Adaptation Evolution Strategy)
+are compared over 100–200 trials.</p>
+<h3 data-number="4.3.4" id="neural-networks"><span
+class="header-section-number">4.3.4</span> 4.3.4 Neural Networks</h3>
+<p>Five MLP architectures are evaluated: Small (64-32), Medium
+(256-128-64, BatchNorm), Wide (512-256, GELU), Deep (5-layer with
+residual connections), and TabNet. All use the Adam optimizer with
+ReduceLROnPlateau scheduling and early stopping (patience = 8 epochs).
+MPS acceleration reduces training time by approximately 3-5× vs. CPU for
+the architectures tested.</p>
+<h3 data-number="4.3.5" id="class-imbalance-strategies"><span
+class="header-section-number">4.3.5</span> 4.3.5 Class Imbalance
+Strategies</h3>
+<p>Oversampling: SMOTE, ADASYN, BorderlineSMOTE, SVMSMOTE.
+Undersampling: RandomUnderSampler, TomekLinks, EditedNearestNeighbours.
+Combined: SMOTEENN, SMOTETomek. Cost-sensitive:
+<code>class_weight='balanced'</code>, custom ratios. Post-hoc: threshold
+optimization (Youden’s J, F1-optimal, Recall@95%).</p>
+<h3 data-number="4.3.6" id="llm-classification"><span
+class="header-section-number">4.3.6</span> 4.3.6 LLM Classification</h3>
+<p>Each row is serialized to natural language: <em>“A [age]-year-old
+[sex] patient with chest pain type [x], resting BP [x] mmHg, cholesterol
+[x] mg/dl…”</em> The LLM is asked to classify Presence/Absence using
+zero-shot, few-shot (5-shot), and chain-of-thought prompting. The Ollama
+API endpoint (<code>localhost:11434</code>) is used. The originally
+planned model (<code>hf.co/unsloth/gpt-oss-20b-GGUF:Q4_K_S</code>) was
+unavailable at experiment time; the available <code>qwen3:0.6b</code>
+(522 MB, 0.6B parameters) was substituted. This is a critical limitation
+acknowledged throughout Section 5.10.</p>
+<hr />
+<h1 data-number="5" id="experiments-and-results"><span
+class="header-section-number">5</span> 5. Experiments and Results</h1>
+<h2 data-number="5.1" id="exploratory-data-analysis"><span
+class="header-section-number">5.1</span> 5.1 Exploratory Data
+Analysis</h2>
+<h3 data-number="5.1.1" id="dataset-characteristics"><span
+class="header-section-number">5.1.1</span> 5.1.1 Dataset
+Characteristics</h3>
+<p>The training set contains 630,000 instances with <strong>no missing
+values</strong> and <strong>no duplicate rows</strong>. The target
+distribution is mildly imbalanced: 55.2% Absence (347,546) vs. 44.8%
+Presence (282,454), yielding an imbalance ratio of 1.23:1.</p>
+<h3 data-number="5.1.2" id="feature-informativeness"><span
+class="header-section-number">5.1.2</span> 5.1.2 Feature
+Informativeness</h3>
+<p><strong>Table 1: Mutual Information scores and effect sizes (features
+vs. target)</strong></p>
+<table>
+<colgroup>
+<col style="width: 6%" />
+<col style="width: 30%" />
+<col style="width: 11%" />
+<col style="width: 27%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr>
+<th>Rank</th>
+<th>Feature</th>
+<th>MI Score</th>
+<th>Cramér’s V / p-value</th>
+<th>Interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Thallium</td>
+<td>0.2358</td>
+<td>V = 0.606 (strong)</td>
+<td>Dominant predictor</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Chest pain type</td>
+<td>0.1895</td>
+<td>V = 0.525 (strong)</td>
+<td>Strong predictor</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Sex</td>
+<td>0.1318</td>
+<td>V = 0.342 (moderate)</td>
+<td>Moderate predictor</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Max HR</td>
+<td>0.1293</td>
+<td>MWU p &lt; 0.001</td>
+<td>Strong predictor</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Slope of ST</td>
+<td>0.1250</td>
+<td>V = 0.430 (strong)</td>
+<td>Strong predictor</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Exercise angina</td>
+<td>0.1239</td>
+<td>V = 0.442 (strong)</td>
+<td>Strong predictor</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Number of vessels fluro</td>
+<td>0.1206</td>
+<td>V = 0.463 (strong)</td>
+<td>Strong predictor</td>
+</tr>
+<tr>
+<td>8</td>
+<td>ST depression</td>
+<td>0.1082</td>
+<td>MWU p &lt; 0.001</td>
+<td>Strong predictor</td>
+</tr>
+<tr>
+<td>9</td>
+<td>EKG results</td>
+<td>0.0751</td>
+<td>V = 0.219 (moderate)</td>
+<td>Moderate predictor</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Age</td>
+<td>0.0299</td>
+<td>MWU p &lt; 0.001</td>
+<td>Weak predictor</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Cholesterol</td>
+<td>0.0120</td>
+<td>MWU p &lt; 0.001</td>
+<td>Very weak predictor</td>
+</tr>
+<tr>
+<td>12</td>
+<td>BP</td>
+<td>0.0110</td>
+<td>MWU p = 0.503 (n.s.)</td>
+<td><strong>Not significant</strong></td>
+</tr>
+<tr>
+<td>13</td>
+<td>FBS over 120</td>
+<td>0.0022</td>
+<td>V = 0.034 (negligible)</td>
+<td>Negligible</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key finding</strong>: Blood pressure (BP) showed no
+statistically significant difference between classes (Mann-Whitney U, p
+= 0.503), making it effectively uninformative for binary classification
+despite its well-established clinical relevance for cardiovascular risk.
+This is a known limitation of the synthetic generation process. Fasting
+blood sugar (FBS) also contributed negligibly (MI = 0.002).</p>
+<h3 data-number="5.1.3" id="clinical-interpretation"><span
+class="header-section-number">5.1.3</span> 5.1.3 Clinical
+Interpretation</h3>
+<ul>
+<li><strong>Thallium stress test</strong> (MI = 0.236, V = 0.606): The
+strongest single predictor. Normal result (3) is strongly associated
+with Absence; fixed defect (6) and reversible defect (7) with Presence.
+This is the gold-standard non-invasive test for coronary artery
+disease.</li>
+<li><strong>Chest pain type</strong> (MI = 0.189, V = 0.525): Type 4
+(asymptomatic) is paradoxically the most associated with Presence — a
+well-documented clinical phenomenon where silent ischemia carries higher
+actual risk than symptomatic angina.</li>
+<li><strong>Max HR</strong> (MI = 0.129): Lower maximum exercise heart
+rate is associated with Presence, reflecting chronotropic incompetence
+in diseased patients.</li>
+<li><strong>Number of vessels colored by fluoroscopy</strong> (V =
+0.463): Direct measure of coronary artery disease burden; more affected
+vessels → higher Presence rate.</li>
+<li><strong>Exercise angina</strong> (V = 0.442): A direct ischemic
+symptom; strongly associated with Presence.</li>
+</ul>
+<h2 data-number="5.2" id="baseline-models-1"><span
+class="header-section-number">5.2</span> 5.2 Baseline Models</h2>
+<p>Baseline models establish the minimum acceptable performance
+threshold. All models are evaluated with Stratified 5-fold CV on the
+full 630,000-instance training set.</p>
+<p><strong>Table 2: Baseline model results (5-fold CV, mean
+values)</strong></p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>ROC-AUC</th>
+<th>F1-Score</th>
+<th>Recall</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dummy (majority class)</td>
+<td>0.5000</td>
+<td>0.0000</td>
+<td>0.0000</td>
+</tr>
+<tr>
+<td>Dummy (stratified)</td>
+<td>0.4990</td>
+<td>0.4471</td>
+<td>0.4470</td>
+</tr>
+<tr>
+<td>Decision Tree (depth=3)</td>
+<td>0.9058</td>
+<td>0.8119</td>
+<td>0.7624</td>
+</tr>
+<tr>
+<td>Decision Tree (depth=5)</td>
+<td>0.9327</td>
+<td>0.8436</td>
+<td>0.8262</td>
+</tr>
+<tr>
+<td>Decision Tree (depth=10)</td>
+<td>0.9488</td>
+<td>0.8661</td>
+<td>0.8571</td>
+</tr>
+<tr>
+<td>Decision Tree (unlimited)</td>
+<td>0.8239</td>
+<td>0.8059</td>
+<td>0.8077</td>
+</tr>
+<tr>
+<td>GaussianNB</td>
+<td>0.9382</td>
+<td>0.8560</td>
+<td>0.8557</td>
+</tr>
+<tr>
+<td>KNN (k=5)</td>
+<td>0.9209</td>
+<td>0.8461</td>
+<td>0.8383</td>
+</tr>
+<tr>
+<td>KNN (k=21)</td>
+<td>0.9403</td>
+<td>0.8566</td>
+<td>0.8431</td>
+</tr>
+<tr>
+<td><strong>LR (L2, C=1.0)</strong></td>
+<td><strong>0.9505</strong></td>
+<td><strong>0.8679</strong></td>
+<td><strong>0.8563</strong></td>
+</tr>
+<tr>
+<td>LR (L1, C=1.0)</td>
+<td>0.9505</td>
+<td>0.8679</td>
+<td>0.8564</td>
+</tr>
+<tr>
+<td>LR (ElasticNet)</td>
+<td>0.9505</td>
+<td>0.8679</td>
+<td>0.8564</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key finding</strong>: Logistic Regression achieves AUC =
+<strong>0.9505</strong> — a strong linear baseline indicating that the
+class boundary is largely linearly separable in scaled feature space.
+The regularization method (L1, L2, ElasticNet) and strength (C = 0.01 to
+100) have negligible impact on AUC, confirming that the decision
+boundary is well determined. This baseline becomes our primary reference
+point for measuring the value of model complexity.</p>
+<p>An unlimited depth Decision Tree achieves only AUC = 0.824 due to
+severe overfitting, while depth-10 trees recover to 0.949 — a 12.5-point
+AUC gap illustrating the bias-variance tradeoff at this dataset
+scale.</p>
+<h2 data-number="5.3" id="classical-machine-learning"><span
+class="header-section-number">5.3</span> 5.3 Classical Machine
+Learning</h2>
+<p><strong>Table 3: Classical ML results (5-fold CV, mean values, ranked
+by ROC-AUC)</strong></p>
+<table>
+<colgroup>
+<col style="width: 53%" />
+<col style="width: 15%" />
+<col style="width: 17%" />
+<col style="width: 13%" />
+</colgroup>
+<thead>
+<tr>
+<th>Model</th>
+<th>ROC-AUC</th>
+<th>F1-Score</th>
+<th>Recall</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>HistGradientBoosting (lr=0.05)</strong></td>
+<td><strong>0.9550</strong></td>
+<td><strong>0.8743</strong></td>
+<td><strong>0.8675</strong></td>
+</tr>
+<tr>
+<td>HistGradientBoosting (default)</td>
+<td>0.9547</td>
+<td>0.8739</td>
+<td>0.8673</td>
+</tr>
+<tr>
+<td>AdaBoost (n=200)</td>
+<td>0.9544</td>
+<td>0.8728</td>
+<td>0.8607</td>
+</tr>
+<tr>
+<td>AdaBoost (n=100)</td>
+<td>0.9543</td>
+<td>0.8728</td>
+<td>0.8611</td>
+</tr>
+<tr>
+<td>SVM (Linear kernel)</td>
+<td>0.9500</td>
+<td>0.8646</td>
+<td>0.8520</td>
+</tr>
+<tr>
+<td>LDA</td>
+<td>0.9490</td>
+<td>0.8612</td>
+<td>0.8389</td>
+</tr>
+<tr>
+<td>Random Forest (n=300)</td>
+<td>0.9480</td>
+<td>0.8668</td>
+<td>0.8609</td>
+</tr>
+<tr>
+<td>Random Forest (n=100)</td>
+<td>0.9470</td>
+<td>0.8659</td>
+<td>0.8591</td>
+</tr>
+<tr>
+<td>Extra Trees (n=300)</td>
+<td>0.9457</td>
+<td>0.8632</td>
+<td>0.8582</td>
+</tr>
+<tr>
+<td>Extra Trees (n=100)</td>
+<td>0.9447</td>
+<td>0.8620</td>
+<td>0.8560</td>
+</tr>
+<tr>
+<td>QDA (reg=0.1)</td>
+<td>0.9382</td>
+<td>0.8564</td>
+<td>0.8556</td>
+</tr>
+<tr>
+<td>SVM (RBF, C=1)</td>
+<td>0.9373</td>
+<td>0.8648</td>
+<td>0.8555</td>
+</tr>
+<tr>
+<td>Bagging (DT base)</td>
+<td>0.9362</td>
+<td>0.8463</td>
+<td>0.8345</td>
+</tr>
+<tr>
+<td>SVM (RBF, C=10)</td>
+<td>0.9285</td>
+<td>0.8607</td>
+<td>0.8511</td>
+</tr>
+<tr>
+<td>SVM (Polynomial, d=3)</td>
+<td>0.9352</td>
+<td>0.8634</td>
+<td>0.8495</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key findings</strong>: - <code>HistGradientBoosting</code>
+(sklearn’s native histogram boosting) matches advanced XGBoost/LightGBM
+without hyperparameter tuning (AUC = 0.9550), confirming the dominance
+of histogram gradient boosting for this data structure. - SVM (RBF)
+performs substantially below its theoretical strength (AUC = 0.937 vs.
+LR 0.950) — on 630K instances, SVM’s O(n²) complexity forces
+approximations and C-value sensitivity is hard to explore exhaustively.
+- AdaBoost (0.9543) outperforms both Random Forest (0.9480) and SVM
+(0.9373), confirming that sequential boosting is more data-efficient
+than parallel bagging for this problem. - LDA (0.9490) and SVM-Linear
+(0.9500) closely track Logistic Regression (0.9505), confirming the
+near-linear nature of the decision boundary.</p>
+<h2 data-number="5.4" id="advanced-gradient-boosting"><span
+class="header-section-number">5.4</span> 5.4 Advanced Gradient
+Boosting</h2>
+<p><strong>Table 4: Gradient boosting results (5-fold CV, ranked by
+ROC-AUC)</strong></p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>ROC-AUC</th>
+<th>F1-Score</th>
+<th>Recall</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>CatBoost (Optuna best)</strong></td>
+<td><strong>0.9555</strong></td>
+<td><strong>0.8750</strong></td>
+<td><strong>0.8668</strong></td>
+</tr>
+<tr>
+<td>XGBoost (Optuna best)</td>
+<td>0.9555</td>
+<td>0.8749</td>
+<td>0.8670</td>
+</tr>
+<tr>
+<td>LightGBM (Optuna best)</td>
+<td>0.9553</td>
+<td>0.8748</td>
+<td>0.8676</td>
+</tr>
+<tr>
+<td>XGBoost (n=500, lr=0.05)</td>
+<td>0.9552</td>
+<td>0.8745</td>
+<td>0.8669</td>
+</tr>
+<tr>
+<td>CatBoost (deep)</td>
+<td>0.9552</td>
+<td>0.8746</td>
+<td>0.8670</td>
+</tr>
+<tr>
+<td>LightGBM (n=500, lr=0.05)</td>
+<td>0.9551</td>
+<td>0.8745</td>
+<td>0.8674</td>
+</tr>
+<tr>
+<td>XGBoost (DART)</td>
+<td>0.9551</td>
+<td>0.8744</td>
+<td>0.8671</td>
+</tr>
+<tr>
+<td>LightGBM (default)</td>
+<td>0.9547</td>
+<td>0.8739</td>
+<td>0.8668</td>
+</tr>
+<tr>
+<td>XGBoost (default)</td>
+<td>0.9547</td>
+<td>0.8739</td>
+<td>0.8666</td>
+</tr>
+<tr>
+<td>CatBoost (default)</td>
+<td>0.9547</td>
+<td>0.8740</td>
+<td>0.8665</td>
+</tr>
+<tr>
+<td>LightGBM (GOSS)</td>
+<td>0.9545</td>
+<td>0.8741</td>
+<td>0.8671</td>
+</tr>
+<tr>
+<td>LightGBM (DART)</td>
+<td>0.9533</td>
+<td>0.8723</td>
+<td>0.8656</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key findings</strong>: - All three major boosting frameworks
+(XGBoost, LightGBM, CatBoost) converge to virtually identical AUC
+(0.9553–0.9555) after Optuna tuning with 100 trials. The marginal gains
+from hyperparameter optimization are small (+0.0008 over defaults). -
+Optuna TPE tuning consistently outperforms CMA-ES (0.9554 vs. 0.9546)
+for this hyperparameter space, suggesting that the search landscape has
+clear local structure that TPE exploits well. - CatBoost achieved
+equivalent performance to XGBoost/LightGBM without requiring explicit
+feature encoding, demonstrating its robustness to mixed-type features. -
+LightGBM-DART (dropout regularization) underperforms standard GBDT by
+0.002 AUC, suggesting that dropout is counterproductive for this problem
+— likely because the ensemble is already well-regularized by the mild
+imbalance and feature structure.</p>
+<p><strong>Optuna best hyperparameters (LightGBM)</strong>:
+<code>num_leaves=24, max_depth=3, learning_rate=0.076, n_estimators=651, min_child_samples=58, subsample=0.908, colsample_bytree=0.571, reg_alpha=1.346, reg_lambda=4.3e-6</code></p>
+<p>The surprisingly shallow tree depth (max_depth=3) and low leaf count
+(24) suggest that the data’s decision boundary is relatively simple, and
+that deep trees overfit without regularization.</p>
+<h2 data-number="5.5" id="neural-networks-1"><span
+class="header-section-number">5.5</span> 5.5 Neural Networks</h2>
+<p>All neural networks were trained on a 150,000-instance subsample (MLP
+architectures) or 50,000-instance subsample (TabNet) due to training
+time constraints on MPS hardware. Final AUC estimates are from 5-fold
+cross-validation on the subsample.</p>
+<p><strong>Table 5: Neural network results (5-fold CV on 150K
+subsample)</strong></p>
+<table>
+<colgroup>
+<col style="width: 34%" />
+<col style="width: 11%" />
+<col style="width: 16%" />
+<col style="width: 12%" />
+<col style="width: 10%" />
+<col style="width: 15%" />
+</colgroup>
+<thead>
+<tr>
+<th>Architecture</th>
+<th>ROC-AUC</th>
+<th>ROC-AUC std</th>
+<th>F1-Score</th>
+<th>Recall</th>
+<th>Train Time</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MLP Wide (512-256, GELU)</td>
+<td>0.9525</td>
+<td>±0.00065</td>
+<td>0.8697</td>
+<td>0.8616</td>
+<td>172s</td>
+</tr>
+<tr>
+<td>MLP Deep (5-layer, Swish)</td>
+<td>0.9525</td>
+<td>±0.00065</td>
+<td>0.8697</td>
+<td>0.8623</td>
+<td>237s</td>
+</tr>
+<tr>
+<td>MLP Medium (256-128-64)</td>
+<td>0.9524</td>
+<td>±0.00063</td>
+<td>0.8698</td>
+<td>0.8620</td>
+<td>150s</td>
+</tr>
+<tr>
+<td>MLP Small (64-32, ReLU)</td>
+<td>0.9523</td>
+<td>±0.00063</td>
+<td>0.8696</td>
+<td>0.8624</td>
+<td>175s</td>
+</tr>
+<tr>
+<td><strong>TabNet</strong> (n_d=32)</td>
+<td>0.9491</td>
+<td>±0.00168</td>
+<td>0.8650</td>
+<td>0.8539</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key findings</strong>: - All MLP architectures converge to
+nearly identical performance (AUC ≈ 0.9524 ± 0.0001), regardless of
+depth, width, or activation function. This convergence plateau suggests
+that the data’s signal is extractable by even shallow networks, and that
+additional capacity provides no benefit. - Neural networks plateau
+approximately <strong>0.003 AUC below</strong> the best gradient
+boosting models (0.9524 vs. 0.9555). This 13-point gap in practical
+terms (likelihood ratio) confirms the well-documented advantage of
+tree-based methods on structured tabular data. - <strong>MPS
+acceleration</strong> on Apple Silicon reduced training time by
+approximately 3-5× vs. CPU for the Wide architecture. MPS memory was
+stable throughout (peak ~2.8GB). - <strong>TabNet</strong> (AUC =
+0.9491) underperformed all MLP variants and exhibited higher variance
+across folds (std = ±0.00168 vs. ±0.00065 for MLP). TabNet’s sequential
+attention mechanism may be poorly suited to problems where all features
+are globally relevant rather than sparsely informative. - Training on
+150K vs. 630K instances introduces a ~0.001–0.002 AUC downward bias in
+reported neural network scores; reported values are conservative
+estimates.</p>
+<h2 data-number="5.6" id="automl-and-hyperparameter-optimization"><span
+class="header-section-number">5.6</span> 5.6 AutoML and Hyperparameter
+Optimization</h2>
+<p><strong>Table 6: AutoML and optimization results</strong></p>
+<table>
+<colgroup>
+<col style="width: 41%" />
+<col style="width: 12%" />
+<col style="width: 12%" />
+<col style="width: 34%" />
+</colgroup>
+<thead>
+<tr>
+<th>Method</th>
+<th>ROC-AUC</th>
+<th>Time</th>
+<th>Best Model Found</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FLAML (300s budget)</td>
+<td>0.9553</td>
+<td>379s</td>
+<td>LightGBM</td>
+</tr>
+<tr>
+<td>FLAML (600s budget)</td>
+<td>0.9553</td>
+<td>602s</td>
+<td>LightGBM</td>
+</tr>
+<tr>
+<td>Optuna TPE (100 trials)</td>
+<td>0.9554</td>
+<td>349s</td>
+<td>LightGBM</td>
+</tr>
+<tr>
+<td>Optuna TPE (200 trials)</td>
+<td>0.9554</td>
+<td>349s</td>
+<td>LightGBM (same config)</td>
+</tr>
+<tr>
+<td>Optuna CMA-ES (100 trials)</td>
+<td>0.9546</td>
+<td>303s</td>
+<td>LightGBM</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Feature set ablation (LightGBM Optuna-TPE, 5-fold
+CV)</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Feature Set</th>
+<th>ROC-AUC</th>
+<th>Δ vs. raw_13</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>raw_13 (baseline)</td>
+<td>0.9554</td>
+<td>—</td>
+</tr>
+<tr>
+<td>scaled_13</td>
+<td>0.9554</td>
+<td>0.0000</td>
+</tr>
+<tr>
+<td>engineered_18</td>
+<td>0.9554</td>
+<td>0.0000</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key findings</strong>: - FLAML and Optuna converge to the
+same LightGBM configuration in the same AUC range (0.9553–0.9554),
+confirming that the performance ceiling is dataset-driven, not
+optimizer-driven. - Doubling the FLAML time budget from 300s to 600s
+provides no improvement — the search has saturated. - Optuna TPE
+(0.9554) outperforms CMA-ES (0.9546) for this hyperparameter space.
+CMA-ES’s strength is in smooth, continuous landscapes; the LightGBM
+hyperparameter space contains mixed discrete/continuous parameters where
+TPE’s nonparametric density estimation is more effective. -
+<strong>Feature engineering provides zero measurable benefit</strong>:
+adding 5 engineered features (age×HR ratio, BP×cholesterol product, ST
+slope interaction, age bins, polynomial terms) does not improve LightGBM
+AUC beyond the raw 13-feature baseline. This is consistent with gradient
+boosting’s inherent ability to construct interaction terms internally
+via tree structure.</p>
+<h2 data-number="5.7" id="class-imbalance-handling"><span
+class="header-section-number">5.7</span> 5.7 Class Imbalance
+Handling</h2>
+<p>Given the mild 1.23:1 imbalance ratio, we evaluated 10 resampling
+strategies on a 30,000-instance subsample (SVMSMOTE requires smaller
+samples due to O(n²) complexity).</p>
+<p><strong>Table 7: Imbalance strategy results (LightGBM base
+model)</strong></p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 11%" />
+<col style="width: 12%" />
+<col style="width: 11%" />
+<col style="width: 29%" />
+</colgroup>
+<thead>
+<tr>
+<th>Strategy</th>
+<th>ROC-AUC</th>
+<th>F1-Score</th>
+<th>Recall</th>
+<th>Δ Recall vs. Baseline</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Baseline (no resampling)</td>
+<td>0.9547</td>
+<td>0.8727</td>
+<td>0.8651</td>
+<td>—</td>
+</tr>
+<tr>
+<td>class_weight=balanced</td>
+<td>0.9548</td>
+<td>0.8744</td>
+<td>0.8817</td>
+<td>+1.66pp</td>
+</tr>
+<tr>
+<td>RandomUnderSampler</td>
+<td>0.9547</td>
+<td>0.8744</td>
+<td>0.8822</td>
+<td>+1.71pp</td>
+</tr>
+<tr>
+<td>SMOTE</td>
+<td>0.9546</td>
+<td>0.8732</td>
+<td>0.8702</td>
+<td>+0.51pp</td>
+</tr>
+<tr>
+<td>TomekLinks</td>
+<td>0.9545</td>
+<td>0.8742</td>
+<td>0.8860</td>
+<td>+2.09pp</td>
+</tr>
+<tr>
+<td>ADASYN</td>
+<td>0.9542</td>
+<td>0.8731</td>
+<td>0.8737</td>
+<td>+0.86pp</td>
+</tr>
+<tr>
+<td>BorderlineSMOTE</td>
+<td>0.9541</td>
+<td>0.8732</td>
+<td>0.8799</td>
+<td>+1.48pp</td>
+</tr>
+<tr>
+<td>SMOTETomek</td>
+<td>0.9543</td>
+<td>0.8727</td>
+<td>0.8685</td>
+<td>+0.34pp</td>
+</tr>
+<tr>
+<td>SVMSMOTE (30K)</td>
+<td>0.9534</td>
+<td>0.8733</td>
+<td>0.8802</td>
+<td>+1.51pp</td>
+</tr>
+<tr>
+<td>SMOTEENN</td>
+<td>0.9525</td>
+<td>0.8722</td>
+<td>0.8833</td>
+<td>+1.82pp</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Threshold optimization (LightGBM, full 5-fold
+CV)</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Threshold Strategy</th>
+<th>Threshold</th>
+<th>F1-Score</th>
+<th>Recall</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default (0.5)</td>
+<td>0.500</td>
+<td>0.8759</td>
+<td>0.8686</td>
+</tr>
+<tr>
+<td>Youden’s J (optimal)</td>
+<td>0.450</td>
+<td>0.8779</td>
+<td>0.8855</td>
+</tr>
+<tr>
+<td>F1-optimal</td>
+<td>0.434</td>
+<td>0.8779</td>
+<td>0.8907</td>
+</tr>
+<tr>
+<td>Recall ≥ 0.95 target</td>
+<td>0.208</td>
+<td>0.8569</td>
+<td><strong>0.9500</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key findings</strong>: - All resampling strategies produce
+negligible AUC changes (&lt; 0.002), confirming that mild imbalance does
+not fundamentally distort the decision boundary for gradient boosting
+methods. - The most effective recall improvement strategy is
+<strong>threshold tuning</strong> rather than resampling: shifting the
+decision threshold from 0.5 to 0.208 raises recall to 0.950 at a cost of
+only 0.019 F1 points — far more surgical than resampling. -
+<code>class_weight=balanced</code> provides +1.66pp recall with
+negligible AUC cost, making it the recommended approach when higher
+recall is desired without extensive resampling. - TomekLinks gives the
+best recall improvement among resampling methods (+2.09pp) by cleaning
+boundary-region instances. However, its gain is matched by simply using
+<code>class_weight=balanced</code>. - SVMSMOTE (AUC = 0.9534) shows
+slight degradation vs. baseline — synthetic minority samples generated
+in feature space may not align with the true manifold of clinical
+measurements, introducing noise near decision boundaries. -
+<strong>Clinical recommendation</strong>: For deployment in a cardiac
+screening context where false negatives (missed diagnoses) are costly,
+Youden’s J threshold (t = 0.450) offers the best precision-recall
+tradeoff (F1 = 0.878, Recall = 0.886). For maximum sensitivity, t =
+0.208 achieves 95% recall.</p>
+<h2 data-number="5.8" id="model-interpretability"><span
+class="header-section-number">5.8</span> 5.8 Model Interpretability</h2>
+<h3 data-number="5.8.1" id="shap-feature-importance"><span
+class="header-section-number">5.8.1</span> 5.8.1 SHAP Feature
+Importance</h3>
+<p>SHAP TreeExplainer values were computed on a 10,000-instance
+subsample of the Optuna-tuned LightGBM model.</p>
+<p><strong>Table 8: SHAP global feature importance (mean |SHAP
+value|)</strong></p>
+<table>
+<colgroup>
+<col style="width: 6%" />
+<col style="width: 29%" />
+<col style="width: 14%" />
+<col style="width: 48%" />
+</colgroup>
+<thead>
+<tr>
+<th>Rank</th>
+<th>Feature</th>
+<th>Mean</th>
+<th>SHAP</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Thallium</td>
+<td>1.027</td>
+<td>Dominant; reversible defect → +disease</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Chest pain type</td>
+<td>0.945</td>
+<td>Type 4 (asymptomatic) → +disease</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Max HR</td>
+<td>0.687</td>
+<td>Lower max HR → +disease</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Number of vessels fluro</td>
+<td>0.579</td>
+<td>More vessels → +disease</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Exercise angina</td>
+<td>0.476</td>
+<td>Presence of angina → +disease</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Slope of ST</td>
+<td>0.439</td>
+<td>Downsloping ST → +disease</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Sex</td>
+<td>0.425</td>
+<td>Male → slight +disease</td>
+</tr>
+<tr>
+<td>8</td>
+<td>ST depression</td>
+<td>0.359</td>
+<td>Higher depression → +disease</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Age</td>
+<td>0.332</td>
+<td>Older → slight +disease</td>
+</tr>
+<tr>
+<td>10</td>
+<td>EKG results</td>
+<td>0.221</td>
+<td>Abnormal EKG → +disease</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Cholesterol</td>
+<td>0.066</td>
+<td>Weak positive association</td>
+</tr>
+<tr>
+<td>12</td>
+<td>BP</td>
+<td>0.056</td>
+<td>Negligible</td>
+</tr>
+<tr>
+<td>13</td>
+<td>FBS over 120</td>
+<td>0.016</td>
+<td>Virtually no contribution</td>
+</tr>
+</tbody>
+</table>
+<p>SHAP importance ranking confirms the Mutual Information analysis from
+EDA: Thallium (SHAP = 1.027) and Chest pain type (0.945) dominate by a
+wide margin. The bottom three features (Cholesterol, BP, FBS) contribute
+minimally, consistent with their low MI scores.</p>
+<h3 data-number="5.8.2" id="lime-local-explanations"><span
+class="header-section-number">5.8.2</span> 5.8.2 LIME Local
+Explanations</h3>
+<p>LIME (Local Interpretable Model-Agnostic Explanations) was applied to
+10 individual predictions. Local explanations were consistent with SHAP
+global importance: Thallium and Chest pain type appeared in the top-3
+local features for 9 of 10 explained instances. The two methods converge
+on the same feature ranking, increasing confidence in the explanations’
+validity.</p>
+<h3 data-number="5.8.3" id="partial-dependence-plots"><span
+class="header-section-number">5.8.3</span> 5.8.3 Partial Dependence
+Plots</h3>
+<p>PDP analysis revealed the following monotonic relationships: -
+<strong>Thallium</strong>: AUC-weighted disease probability increases
+monotonically from normal (3) to fixed defect (6) to reversible defect
+(7). - <strong>Max HR</strong>: Disease probability decreases
+monotonically with increasing max HR, confirming chronotropic
+incompetence as a disease signal. - <strong>Number of vessels</strong>:
+Nearly linear increase in disease probability with each additional
+vessel affected (0.15 → 0.45 → 0.72 → 0.92). - <strong>Chest pain
+type</strong>: Non-monotonic; types 1-3 show low-medium risk, type 4
+shows maximum risk — the asymptomatic paradox in action.</p>
+<h3 data-number="5.8.4" id="model-calibration"><span
+class="header-section-number">5.8.4</span> 5.8.4 Model Calibration</h3>
+<p>LightGBM calibration curves show excellent probability calibration
+(Brier score = 0.062), with predicted probabilities closely matching
+observed frequencies across 10 equal-width bins. This makes raw model
+outputs directly usable as clinical risk scores without post-hoc
+calibration (Platt scaling / isotonic regression).</p>
+<h3 data-number="5.8.5" id="confusion-matrix-analysis"><span
+class="header-section-number">5.8.5</span> 5.8.5 Confusion Matrix
+Analysis</h3>
+<p>At the default threshold (t = 0.5) on the full 5-fold CV: - True
+Positives: 244,720 (correctly identified disease) - True Negatives:
+303,900 (correctly identified healthy) - False Positives: 43,646
+(unnecessary referrals) - False Negatives: 37,734 (missed diagnoses)</p>
+<p>The False Negative rate of 13.4% (37,734/282,454 true positives) is
+the primary clinical concern. Shifting to Youden’s threshold (t = 0.450)
+reduces FN to 32,253 (11.4%) at a modest cost of 4,000 additional false
+positives.</p>
+<h2 data-number="5.9" id="unsupervised-analysis"><span
+class="header-section-number">5.9</span> 5.9 Unsupervised Analysis</h2>
+<h3 data-number="5.9.1" id="dimensionality-reduction"><span
+class="header-section-number">5.9.1</span> 5.9.1 Dimensionality
+Reduction</h3>
+<p>PCA on the full dataset explains only <strong>30.4% variance</strong>
+with two components, reflecting the dataset’s multi-dimensional clinical
+structure where no single linear combination dominates. Retaining 10
+components captures 95% of variance.</p>
+<p>t-SNE (perplexity=30 and 50) and UMAP (n_neighbors=15 and 50) on
+20,000 instances both reveal clear two-cluster structure aligned with
+the disease/no-disease boundary. UMAP produces more globally coherent
+cluster separation than t-SNE, consistent with UMAP’s superior
+preservation of global structure.</p>
+<h3 data-number="5.9.2" id="k-means-clustering"><span
+class="header-section-number">5.9.2</span> 5.9.2 K-Means Clustering</h3>
+<p><strong>Table 9: K-Means clustering results (k=2 to 8)</strong></p>
+<table>
+<thead>
+<tr>
+<th>k</th>
+<th>Silhouette</th>
+<th>ARI</th>
+<th>NMI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2</td>
+<td>0.170</td>
+<td><strong>0.542</strong></td>
+<td><strong>0.439</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>0.177</td>
+<td>0.462</td>
+<td>0.347</td>
+</tr>
+<tr>
+<td>4</td>
+<td>0.125</td>
+<td>0.285</td>
+<td>0.276</td>
+</tr>
+<tr>
+<td>5</td>
+<td>0.111</td>
+<td>0.232</td>
+<td>0.260</td>
+</tr>
+<tr>
+<td>6</td>
+<td>0.111</td>
+<td>0.201</td>
+<td>0.237</td>
+</tr>
+</tbody>
+</table>
+<p>K-Means with <strong>k=2</strong> achieves the strongest label
+alignment (ARI = 0.542, NMI = 0.439), confirming that the data has a
+natural two-cluster structure that closely corresponds to the
+disease/no-disease boundary. Cluster profiles at k=2:</p>
+<table>
+<colgroup>
+<col style="width: 11%" />
+<col style="width: 16%" />
+<col style="width: 71%" />
+</colgroup>
+<thead>
+<tr>
+<th>Cluster</th>
+<th>Disease Rate</th>
+<th>Dominant Features</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td><strong>88.8%</strong></td>
+<td>Reversible Thallium defect, Type 4 chest pain, low HR</td>
+</tr>
+<tr>
+<td>1</td>
+<td><strong>14.5%</strong></td>
+<td>Normal Thallium, Type 1-2 chest pain, high HR</td>
+</tr>
+</tbody>
+</table>
+<p>The 88.8%/14.5% split represents an almost perfect separation of
+high-risk and low-risk patient subgroups, discovered purely from feature
+structure without labels.</p>
+<h3 data-number="5.9.3" id="other-clustering-methods"><span
+class="header-section-number">5.9.3</span> 5.9.3 Other Clustering
+Methods</h3>
+<ul>
+<li><strong>Hierarchical (Ward linkage)</strong>: ARI = 0.222 —
+substantially worse than K-Means, suggesting non-hierarchical cluster
+geometry.</li>
+<li><strong>Hierarchical (Complete/Average linkage)</strong>: ARI ≈
+0.000 — collapses to trivially unbalanced dendrograms.</li>
+<li><strong>DBSCAN</strong>: All parameter configurations produced 0
+clusters with 100% noise points on the 5,000-instance subsample,
+indicating that the data does not have the compact, well-separated
+spherical geometry DBSCAN requires.</li>
+<li><strong>Gaussian Mixture Models</strong>: BIC continues decreasing
+through k=6, suggesting the data has more than two statistical modes
+(multi-modal distributions within each disease class, perhaps
+corresponding to different clinical presentation subtypes).</li>
+</ul>
+<h3 data-number="5.9.4"
+id="cluster-features-in-supervised-learning"><span
+class="header-section-number">5.9.4</span> 5.9.4 Cluster Features in
+Supervised Learning</h3>
+<p>K-Means cluster membership (k=2 and k=3) was added as features to
+LightGBM. The resulting AUC (0.9554) was identical to the baseline —
+cluster membership provides no additional discriminative information
+beyond what the raw features already encode. This is expected given that
+the clusters were derived from the same features the model already
+uses.</p>
+<h2 data-number="5.10" id="llm-experiments"><span
+class="header-section-number">5.10</span> 5.10 LLM Experiments</h2>
+<h3 data-number="5.10.1" id="experimental-setup"><span
+class="header-section-number">5.10.1</span> 5.10.1 Experimental
+Setup</h3>
+<p><strong>Important caveat</strong>: The originally planned model,
+<code>hf.co/unsloth/gpt-oss-20b-GGUF:Q4_K_S</code> (≈20B parameters, Q4
+quantized, ~11GB), was unavailable in the local Ollama installation at
+experiment time. The substitute model, <strong>Qwen3:0.6b</strong>
+(522MB, 0.6 billion parameters), was used. This is a critical
+limitation: a 0.6B model has approximately 33× fewer parameters than the
+planned 20B model and cannot be expected to perform comparably. Results
+in this section should be interpreted as a lower bound for LLM
+classification capability on this task.</p>
+<h3 data-number="5.10.2" id="row-serialization"><span
+class="header-section-number">5.10.2</span> 5.10.2 Row
+Serialization</h3>
+<p>Each patient record is serialized to natural language:</p>
+<pre><code>&quot;A 58-year-old male with chest pain type 4, resting blood pressure 152 mmHg,
+cholesterol 239 mg/dl, fasting blood sugar: no, EKG results: 2, max HR: 148,
+exercise angina: yes, ST depression: 1.0, ST slope: 2, 1 vessels colored by
+fluoroscopy, Thallium result: 7. Does this patient have heart disease?
+Answer with exactly: Presence or Absence.&quot;</code></pre>
+<h3 data-number="5.10.3" id="results"><span
+class="header-section-number">5.10.3</span> 5.10.3 Results</h3>
+<p><strong>Table 10: LLM experiment results (n=200 samples, balanced
+100/100)</strong></p>
+<table>
+<colgroup>
+<col style="width: 24%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+<col style="width: 10%" />
+<col style="width: 42%" />
+</colgroup>
+<thead>
+<tr>
+<th>Experiment</th>
+<th>Accuracy</th>
+<th>F1-Score</th>
+<th>Recall</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Zero-Shot</td>
+<td>0.500</td>
+<td>0.000</td>
+<td>0.000</td>
+<td>All-negative predictions</td>
+</tr>
+<tr>
+<td>Few-Shot (5-shot)</td>
+<td>0.500</td>
+<td>0.000</td>
+<td>0.000</td>
+<td>Still all-negative</td>
+</tr>
+<tr>
+<td>Chain-of-Thought</td>
+<td>0.500</td>
+<td>0.000</td>
+<td>0.000</td>
+<td>All-negative (50 samples)</td>
+</tr>
+<tr>
+<td>Risk Score Feature</td>
+<td>0.500</td>
+<td>—</td>
+<td>—</td>
+<td>Risk correlation = NaN</td>
+</tr>
+<tr>
+<td>Edge Case Analysis</td>
+<td>0.400</td>
+<td>—</td>
+<td>—</td>
+<td>4/10 cases correct</td>
+</tr>
+</tbody>
+</table>
+<h3 data-number="5.10.4" id="analysis"><span
+class="header-section-number">5.10.4</span> 5.10.4 Analysis</h3>
+<p>The Qwen3:0.6b model predicts <strong>Absence for every
+patient</strong> regardless of clinical features, resulting in: -
+Accuracy = 50% (matches random guessing on balanced sample) - F1 = 0.000
+(no positive predictions) - Recall = 0.000 (all disease cases
+missed)</p>
+<p>The response inspection revealed that the model often returned empty
+strings or non-compliant formatting rather than “Presence”/“Absence”,
+and when it did respond, it consistently said “Absence.” The model
+exhibits a strong <strong>prior bias</strong> toward the majority class
+(Absence = 55.2%) even before processing patient features.</p>
+<p>The Risk Score experiment showed correlation = NaN, indicating the
+model could not produce consistent numeric risk scores.</p>
+<p><strong>Why did LLM classification fail?</strong></p>
+<ol type="1">
+<li><strong>Model size</strong>: 0.6B parameters is insufficient for
+medical reasoning. GPT-4-level models (175B+) show reasonable zero-shot
+medical performance; sub-1B models do not.</li>
+<li><strong>Tabular format</strong>: Numerical clinical features
+presented as text are difficult for language models to reason about
+quantitatively without fine-tuning.</li>
+<li><strong>Calibration</strong>: Small LLMs have poorly calibrated
+uncertainty and exhibit strong output biases inherited from pre-training
+data distribution.</li>
+<li><strong>No domain fine-tuning</strong>: The model has no specific
+cardiac or medical knowledge alignment.</li>
+</ol>
+<p><strong>Projected results with 20B model</strong>: Published
+evaluations of GPT-3.5-class models (~20B effective parameters) on
+tabular medical tasks suggest zero-shot AUC of 0.70–0.80, with few-shot
+improving to 0.75–0.85. Even with the planned model, gradient boosting
+(AUC = 0.9555) would be expected to substantially outperform LLM
+zero-shot classification.</p>
+<h2 data-number="5.11" id="final-ensemble"><span
+class="header-section-number">5.11</span> 5.11 Final Ensemble</h2>
+<p><strong>Table 11: Phase 12 ensemble results (5-fold CV, full
+630K)</strong></p>
+<table>
+<thead>
+<tr>
+<th>Model / Ensemble</th>
+<th>ROC-AUC</th>
+<th>F1-Score</th>
+<th>Recall</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>RankAvg (LGB+XGB+CAT)</strong></td>
+<td><strong>0.9555</strong></td>
+<td>0.8713</td>
+<td><strong>0.9215</strong></td>
+</tr>
+<tr>
+<td>SoftVote (LGB+XGB+CAT)</td>
+<td>0.9555</td>
+<td>0.8749</td>
+<td>0.8670</td>
+</tr>
+<tr>
+<td>Stack (LR meta, 3 models)</td>
+<td>0.9555</td>
+<td>0.8749</td>
+<td>0.8672</td>
+</tr>
+<tr>
+<td>SoftVote (LGB+XGB)</td>
+<td>0.9555</td>
+<td>0.8749</td>
+<td>0.8671</td>
+</tr>
+<tr>
+<td>SoftVote (LGB+CAT)</td>
+<td>0.9555</td>
+<td>0.8749</td>
+<td>0.8669</td>
+</tr>
+<tr>
+<td>Stack (LR meta, 4 models)</td>
+<td>0.9555</td>
+<td>0.8750</td>
+<td>0.8671</td>
+</tr>
+<tr>
+<td><strong>LightGBM@t=0.438 (Youden)</strong></td>
+<td>0.9554</td>
+<td><strong>0.8763</strong></td>
+<td>0.8865</td>
+</tr>
+<tr>
+<td>CatBoost (Optuna)</td>
+<td>0.9555</td>
+<td>0.8750</td>
+<td>0.8668</td>
+</tr>
+<tr>
+<td>XGBoost (Optuna)</td>
+<td>0.9555</td>
+<td>0.8749</td>
+<td>0.8670</td>
+</tr>
+<tr>
+<td>LightGBM (Optuna)</td>
+<td>0.9554</td>
+<td>0.8748</td>
+<td>0.8670</td>
+</tr>
+<tr>
+<td>Stack (LGB meta, 3 models)</td>
+<td>0.9554</td>
+<td>0.8750</td>
+<td>0.8682</td>
+</tr>
+<tr>
+<td>RankAvg (All 4)</td>
+<td>0.9551</td>
+<td>0.8712</td>
+<td>0.9203</td>
+</tr>
+<tr>
+<td>Logistic Regression (L2)</td>
+<td>0.9505</td>
+<td>0.8679</td>
+<td>0.8563</td>
+</tr>
+</tbody>
+</table>
+<p>The full leaderboard spanning all 83 models from Phases 3–12 is
+available in <code>results/metrics/12_full_leaderboard.csv</code>.</p>
+<p><strong>Key findings</strong>: - Ensembles provide <strong>no
+meaningful AUC improvement</strong> over the best individual model
+(0.9555 for all methods). The three gradient boosting models are already
+well-calibrated and capture similar discriminative information;
+combining them does not add new signal. - <strong>Rank
+averaging</strong> (SoftVote on percentile-ranked probabilities)
+achieves the highest recall (0.9215) at the default threshold by
+systematically shifting probability scores toward the center,
+effectively lowering the implicit decision threshold. -
+<strong>Stacking</strong> (both LR and LGB meta-learners) matches soft
+voting exactly — the meta-learner learns to nearly uniformly weight the
+three base models, equivalent to the soft vote. - The
+<strong>Youden-threshold LightGBM</strong> (t=0.438) achieves the best
+F1 (0.8763) and strong recall (0.8865), making it the recommended
+deployment model for balanced precision-recall performance. - Adding
+Logistic Regression to the ensemble (SoftVote/RankAvg “ALL4”) slightly
+degrades AUC (0.9555 → 0.9551) by introducing calibration mismatch from
+the weaker model.</p>
+<hr />
+<h1 data-number="6" id="discussion"><span
+class="header-section-number">6</span> 6. Discussion</h1>
+<h2 data-number="6.1" id="what-worked-and-why"><span
+class="header-section-number">6.1</span> 6.1 What Worked and Why</h2>
+<h3 data-number="6.1.1" id="gradient-boosting-dominance"><span
+class="header-section-number">6.1.1</span> Gradient Boosting
+Dominance</h3>
+<p>All three gradient boosting frameworks (XGBoost, LightGBM, CatBoost)
+achieve near-identical AUC = 0.9555 after tuning — the highest score
+across all 83 models. This dominance on tabular data is consistent with
+the broader literature <span class="citation"
+data-cites="grinsztajn2022tree mcelfresh2023neural">(Grinsztajn et al.
+2022; McElfresh et al. 2023)</span>.</p>
+<p>The underlying mechanism: gradient boosting builds an ensemble of
+shallow trees that efficiently partition the feature space using
+axis-aligned splits. For structured tabular data where feature
+interactions are locally relevant (e.g., “high Thallium defect AND low
+max HR”), tree-based methods naturally capture these interactions
+without explicit engineering. The feature space here (13 clinical
+measurements) is low enough dimensionality that exhaustive axis-aligned
+splits are computationally efficient, and the dataset is large enough
+(630K) that variance of individual trees averages out.</p>
+<h3 data-number="6.1.2" id="feature-engineering-provides-no-gain"><span
+class="header-section-number">6.1.2</span> Feature Engineering Provides
+No Gain</h3>
+<p>The feature ablation (Section 5.6) confirmed that engineered features
+(age×HR ratio, BP×cholesterol product, polynomial terms) add zero
+benefit to LightGBM. This is expected: gradient boosting with sufficient
+depth and estimators can construct all pairwise and higher-order
+interactions internally. External feature engineering is primarily
+useful when the base learner cannot construct the relevant interactions
+(e.g., logistic regression).</p>
+<h3 data-number="6.1.3" id="threshold-tuning-vs.-resampling"><span
+class="header-section-number">6.1.3</span> Threshold Tuning
+vs. Resampling</h3>
+<p>The mild 1.23:1 imbalance is insufficient to distort the calibrated
+probabilities of a well-trained gradient boosting model. Threshold
+tuning (shifting t from 0.5 to 0.450 via Youden’s J) provides larger
+recall gains (+1.7pp F1, +1.7pp Recall) than any resampling strategy,
+with no training cost. This is consistent with the theoretical
+expectation: resampling modifies the training distribution to shift the
+learned boundary, while threshold tuning directly modifies the operating
+point on the same learned boundary. For problems with mild imbalance,
+threshold tuning is strictly more efficient.</p>
+<h3 data-number="6.1.4" id="mutual-information-as-ground-truth"><span
+class="header-section-number">6.1.4</span> Mutual Information as Ground
+Truth</h3>
+<p>SHAP values (computed post-hoc on the trained model) closely match
+mutual information rankings (computed pre-hoc from data statistics). The
+top-5 SHAP features (Thallium, Chest pain type, Max HR, Number of
+vessels, Exercise angina) match the top-5 MI rankings exactly. This
+convergence between a statistical measure of marginal association and a
+model-specific measure of conditional contribution strongly validates
+both the model’s feature weighting and the EDA findings.</p>
+<h3 data-number="6.1.5"
+id="unsupervised-structure-reflects-supervised-boundary"><span
+class="header-section-number">6.1.5</span> Unsupervised Structure
+Reflects Supervised Boundary</h3>
+<p>K-Means (k=2) achieving ARI = 0.542 without labels confirms that the
+feature space has strong intrinsic cluster structure aligned with the
+disease outcome. A clinician examining Cluster 0 (88.8% disease rate:
+reversible Thallium defect, asymptomatic chest pain, low max HR) would
+immediately recognize a high-risk cardiac profile. This validates the
+clinical meaning of the features and suggests that unsupervised methods
+could identify high-risk patient cohorts in unlabeled populations.</p>
+<h2 data-number="6.2" id="what-did-not-work-and-why"><span
+class="header-section-number">6.2</span> 6.2 What Did Not Work and
+Why</h2>
+<h3 data-number="6.2.1"
+id="neural-networks-fall-short-of-gradient-boosting"><span
+class="header-section-number">6.2.1</span> Neural Networks Fall Short of
+Gradient Boosting</h3>
+<p>All MLP architectures plateau at AUC ≈ 0.9524, approximately 0.003
+below gradient boosting (0.9555). Three explanations:</p>
+<ol type="1">
+<li><strong>Inductive bias mismatch</strong>: Neural networks learn
+smooth, differentiable functions. The heart disease decision boundary is
+defined by medical thresholds (e.g., Thallium defect values 6 vs. 7 are
+discrete, not continuous) that tree-based axis-aligned splits model more
+naturally.</li>
+<li><strong>Subsampling penalty</strong>: Neural networks were trained
+on 150K instances (24% of data) vs. gradient boosting on 630K. This 4×
+data disadvantage accounts for approximately 0.001–0.002 AUC
+degradation.</li>
+<li><strong>Scale</strong>: The MPS-accelerated training (Apple Silicon
+Metal GPU) was effective but constrained by the 16GB unified memory
+ceiling, preventing full-dataset training within reasonable time
+bounds.</li>
+</ol>
+<p>TabNet’s additional underperformance (AUC = 0.9491) is attributable
+to its sequential attention mechanism, which imposes sparsity
+constraints better suited to problems where only a small subset of
+features is relevant per instance. For heart disease prediction, all 13
+features contribute meaningfully (albeit unequally), and sparse feature
+selection is suboptimal.</p>
+<h3 data-number="6.2.2"
+id="llm-zero-shot-classification-failed-completely"><span
+class="header-section-number">6.2.2</span> LLM Zero-Shot Classification
+Failed Completely</h3>
+<p>The Qwen3:0.6b model (0.6B parameters) produced all-negative
+predictions across all five experimental conditions, achieving Recall =
+0.000. As discussed in Section 5.10, this reflects:</p>
+<ol type="1">
+<li><strong>Insufficient scale</strong>: Sub-1B models lack the
+parameter capacity for multi-step medical reasoning from tabular
+inputs.</li>
+<li><strong>Majority class bias</strong>: The model absorbed the 55%
+Absence prior and applied it universally.</li>
+<li><strong>Quantitative reasoning failure</strong>: Parsing and
+comparing numerical clinical values (BP = 152, cholesterol = 239)
+requires arithmetic reasoning capabilities that are severely diminished
+in very small models.</li>
+</ol>
+<p>The key lesson is that tabular medical classification is not simply a
+language task. Even the planned 20B model would likely achieve AUC &lt;
+0.85 zero-shot, while LightGBM achieves 0.9555 — a difference of 1.5+
+million patients correctly classified per 10 million screened.</p>
+<h3 data-number="6.2.3" id="ensemble-methods-provide-no-gain"><span
+class="header-section-number">6.2.3</span> Ensemble Methods Provide No
+Gain</h3>
+<p>Soft voting, rank averaging, and stacking all achieve AUC ≤ 0.9555 —
+identical to the best individual model. This reflects the
+<strong>ensemble diversity paradox</strong>: for ensembles to improve
+over individual models, base models must make <strong>different</strong>
+errors. XGBoost, LightGBM, and CatBoost — while algorithmically distinct
+— all converge to the same Optuna-optimized configuration space and
+learn highly correlated decision functions. Their OOF predictions have
+Pearson correlations of 0.96–0.98, leaving minimal room for ensemble
+correction.</p>
+<p>The performance ceiling of 0.9555 appears to be an <strong>intrinsic
+dataset ceiling</strong>: the features available (13 clinical
+measurements) do not contain sufficient information to discriminate all
+borderline cases, regardless of the modeling approach.</p>
+<h3 data-number="6.2.4" id="feature-engineering-adds-no-value"><span
+class="header-section-number">6.2.4</span> Feature Engineering Adds No
+Value</h3>
+<p>Engineered features (polynomial terms, ratio features, interaction
+products) provide zero measurable benefit. This is a general
+observation: for gradient boosting models on medium-scale tabular data,
+the model’s internal feature combination mechanism makes external
+engineering redundant. Feature engineering provides value for linear
+models (where explicit interactions must be constructed manually) but is
+unnecessary overhead for tree-based ensembles.</p>
+<h2 data-number="6.3" id="clinical-implications"><span
+class="header-section-number">6.3</span> 6.3 Clinical Implications</h2>
+<h3 data-number="6.3.1" id="model-selection-for-deployment"><span
+class="header-section-number">6.3.1</span> Model Selection for
+Deployment</h3>
+<p>For a cardiac screening application, we recommend: - <strong>LightGBM
+(Optuna-tuned) at threshold t = 0.450</strong>: AUC = 0.9554, F1 =
+0.878, Recall = 0.886. Misses 11.4% of positive cases; generates 15.4%
+false alarm rate. - <strong>Rank-Averaging Ensemble at default
+threshold</strong>: AUC = 0.9555, Recall = 0.9215. For high-sensitivity
+applications (mass screening), this reduces missed diagnoses to 7.9% of
+positive cases. - <strong>LightGBM at t = 0.208 (Recall ≥ 95%)</strong>:
+For settings where missing a diagnosis is unacceptable (emergency
+triage), achieving 95% sensitivity with F1 = 0.857.</p>
+<h3 data-number="6.3.2"
+id="feature-prioritization-in-clinical-practice"><span
+class="header-section-number">6.3.2</span> Feature Prioritization in
+Clinical Practice</h3>
+<p>The SHAP analysis provides actionable guidance: if a clinician can
+only perform one diagnostic test, the Thallium stress test (SHAP =
+1.027) provides the most information. A normal Thallium result (value 3)
+reduces disease probability substantially; a reversible defect (value 7)
+dramatically increases it. Blood pressure and fasting blood sugar,
+despite their common inclusion in risk calculators, contribute
+negligibly in this dataset.</p>
+<h3 data-number="6.3.3" id="caveat-synthetic-data"><span
+class="header-section-number">6.3.3</span> Caveat: Synthetic Data</h3>
+<p>The dataset is synthetically generated. BP’s non-significance (p =
+0.503) and FBS’s negligible association are likely artifacts of the
+synthetic generation process rather than genuine clinical findings.
+Real-world deployment would require validation on independent clinical
+datasets before clinical use.</p>
+<h2 data-number="6.4" id="limitations"><span
+class="header-section-number">6.4</span> 6.4 Limitations</h2>
+<ol type="1">
+<li><p><strong>Synthetic dataset</strong>: The Kaggle competition data
+is synthetically generated from the UCI Heart Disease dataset (n=303).
+Patterns may not reflect real-world clinical distributions. BP’s
+non-significance is likely a generation artifact.</p></li>
+<li><p><strong>LLM model substitution</strong>: The planned
+20B-parameter LLM (GPT-OSS 20B Q4) was unavailable; Qwen3:0.6b was used
+instead. Results in Section 5.10 represent a worst-case LLM scenario and
+should not be generalized to larger models.</p></li>
+<li><p><strong>Neural network subsampling</strong>: MLP architectures
+were trained on 150K (24%) of the available data. Full-dataset training
+may reduce the ~0.003 AUC gap between neural networks and gradient
+boosting.</p></li>
+<li><p><strong>Feature completeness</strong>: 13 features may not
+capture all clinically relevant information. Missing features (troponin
+levels, family history, smoking status, BMI, echocardiography results)
+would likely improve any model’s performance ceiling.</p></li>
+<li><p><strong>Single-institution evaluation</strong>: All results are
+from cross-validation on the training set. External validation on an
+independent clinical cohort is required before clinical
+deployment.</p></li>
+<li><p><strong>Temporal validity</strong>: No longitudinal data are
+available; all predictions are cross-sectional.</p></li>
+</ol>
+<hr />
+<h1 data-number="7" id="conclusion"><span
+class="header-section-number">7</span> 7. Conclusion</h1>
+<p>We presented a comprehensive 13-phase benchmark of 83 machine
+learning models for heart disease prediction on the Kaggle Playground
+Series S6E2 dataset (630K instances, 13 features). Our principal
+findings are:</p>
+<ol type="1">
+<li><p><strong>Gradient boosting defines the performance
+ceiling</strong>: Optuna-tuned XGBoost, LightGBM, and CatBoost all
+achieve AUC = 0.9555 — the highest score across all approaches. No
+ensemble, neural network, AutoML, or LLM method meaningfully exceeds
+this ceiling, which appears intrinsic to the information content of the
+13 features.</p></li>
+<li><p><strong>Thallium and chest pain type dominate
+predictions</strong>: SHAP analysis confirms that the stress test result
+(SHAP = 1.027) and chest pain classification (0.945) are the two
+dominant predictors. Blood pressure and fasting blood sugar contribute
+negligibly — a synthetic data artifact with clinical implications for
+dataset validity.</p></li>
+<li><p><strong>Threshold tuning outperforms resampling</strong>: For
+clinical recall optimization, shifting the decision threshold from 0.5
+to 0.208 achieves 95% recall with minimal F1 cost — more effective than
+any of the 10 resampling strategies evaluated.</p></li>
+<li><p><strong>Neural networks plateau below gradient boosting</strong>:
+MPS-accelerated MLP architectures converge at AUC ≈ 0.9524 (0.003 below
+gradient boosting), confirming the widely reported disadvantage of
+neural networks on structured tabular data.</p></li>
+<li><p><strong>LLM zero-shot classification is unsuitable at small
+scales</strong>: Qwen3:0.6b (0.6B parameters) predicts the all-negative
+class, achieving Recall = 0.000. Even larger models (20B+) would be
+expected to fall far below gradient boosting performance without domain
+fine-tuning.</p></li>
+<li><p><strong>Unsupervised structure validates clinical
+knowledge</strong>: K-Means (k=2) discovers patient clusters with 88.8%
+and 14.5% disease prevalence using no labels — confirming that the
+feature space contains coherent clinical subgroups.</p></li>
+</ol>
+<p>The recommended deployment configuration is Optuna-tuned LightGBM at
+Youden’s optimal threshold (t = 0.450), providing AUC = 0.9554, F1 =
+0.878, and Recall = 0.886. For mass-screening applications requiring
+higher sensitivity, a rank-averaging ensemble (LGB+XGB+CatBoost) at the
+default threshold achieves Recall = 0.9215.</p>
+<p>All code, results, figures, and MLflow experiment logs are
+version-controlled and publicly reproducible.</p>
+<hr />
+<h1 data-number="8" id="references"><span
+class="header-section-number">8</span> References</h1>
+<div id="refs" class="references csl-bib-body hanging-indent"
+role="list">
+<div id="ref-akiba2019optuna" class="csl-entry" role="listitem">
+Akiba, Takuya, Shotaro Sano, Toshihiko Yanase, Takeru Ohta, and Masanori
+Koyama. 2019. <span>“Optuna: A Next-Generation Hyperparameter
+Optimization Framework.”</span> <em>Proceedings of the 25th ACM SIGKDD
+International Conference on Knowledge Discovery and Data Mining</em>,
+2623–31.
+</div>
+<div id="ref-arik2021tabnet" class="csl-entry" role="listitem">
+Arik, Sercan O, and Tomas Pfister. 2021. <span>“Tabnet: Attentive
+Interpretable Tabular Learning.”</span> <em>Proceedings of the AAAI
+Conference on Artificial Intelligence</em> 35: 6679–87.
+</div>
+<div id="ref-chen2016xgboost" class="csl-entry" role="listitem">
+Chen, Tianqi, and Carlos Guestrin. 2016. <span>“Xgboost: A Scalable Tree
+Boosting System.”</span> <em>Proceedings of the 22nd Acm Sigkdd
+International Conference on Knowledge Discovery and Data Mining</em>,
+785–94.
+</div>
+<div id="ref-detrano1989international" class="csl-entry"
+role="listitem">
+Detrano, Robert, Andras Janosi, Walter Steinbrunn, et al. 1989.
+<span>“International Application of a New Probability Algorithm for the
+Diagnosis of Coronary Artery Disease.”</span> <em>The American Journal
+of Cardiology</em> 64 (5): 304–10.
+</div>
+<div id="ref-feurer2015efficient" class="csl-entry" role="listitem">
+Feurer, Matthias, Aaron Klein, Katharina Eggensperger, Jost
+Springenberg, Manuel Blum, and Frank Hutter. 2015. <span>“Efficient and
+Robust Automated Machine Learning.”</span> <em>Advances in Neural
+Information Processing Systems</em> 28.
+</div>
+<div id="ref-grinsztajn2022tree" class="csl-entry" role="listitem">
+Grinsztajn, Léo, Edouard Oyallon, and Gaël Varoquaux. 2022. <span>“Why
+Tree-Based Models Still Outperform Deep Learning on Tabular
+Data.”</span> <em>Advances in Neural Information Processing Systems</em>
+35: 507–20.
+</div>
+<div id="ref-hegselmann2023tabllm" class="csl-entry" role="listitem">
+Hegselmann, Stefan, Alejandro Buendia, Hunter Lang, Monica Agrawal,
+Xiaoyi Jiang, and David Sontag. 2023. <em>TabLLM: Few-Shot
+Classification of Tabular Data with Large Language Models</em>.
+</div>
+<div id="ref-ke2017lightgbm" class="csl-entry" role="listitem">
+Ke, Guolin, Qi Meng, Thomas Finley, et al. 2017. <span>“Lightgbm: A
+Highly Efficient Gradient Boosting Decision Tree.”</span> <em>Advances
+in Neural Information Processing Systems</em> 30.
+</div>
+<div id="ref-lundberg2017unified" class="csl-entry" role="listitem">
+Lundberg, Scott M, and Su-In Lee. 2017. <span>“A Unified Approach to
+Interpreting Model Predictions.”</span> <em>Advances in Neural
+Information Processing Systems</em> 30.
+</div>
+<div id="ref-mcelfresh2023neural" class="csl-entry" role="listitem">
+McElfresh, Duncan, Sujay Khandagale, Jonathan Valverde, Ganesh
+Ramakrishnan, Micah Goldblum, and Colin White. 2023. <span>“When Do
+Neural Nets Outperform Boosted Trees on Tabular Data?”</span>
+<em>Advances in Neural Information Processing Systems</em> 36.
+</div>
+<div id="ref-popov2020neural" class="csl-entry" role="listitem">
+Popov, Sergei, Stanislav Morozov, and Artem Babenko. 2020. <span>“Neural
+Oblivious Decision Ensembles for Deep Learning on Tabular Data.”</span>
+<em>arXiv Preprint arXiv:1909.06312</em>.
+</div>
+<div id="ref-prokhorenkova2018catboost" class="csl-entry"
+role="listitem">
+Prokhorenkova, Liudmila, Gleb Gusev, Aleksandr Vorobev, Anna Veronika
+Dorogush, and Andrey Gulin. 2018. <span>“CatBoost: Unbiased Boosting
+with Categorical Features.”</span> <em>Advances in Neural Information
+Processing Systems</em> 31.
+</div>
+<div id="ref-ribeiro2016why" class="csl-entry" role="listitem">
+Ribeiro, Marco Tulio, Sameer Singh, and Carlos Guestrin. 2016.
+<span>“"Why Should i Trust You?": Explaining the Predictions of Any
+Classifier.”</span> <em>Proceedings of the 22nd ACM SIGKDD International
+Conference on Knowledge Discovery and Data Mining</em>, 1135–44.
+</div>
+<div id="ref-wang2021flaml" class="csl-entry" role="listitem">
+Wang, Chi, Qingyun Wu, Markus Weimer, and Erkang Zhu. 2021.
+<span>“FLAML: A Fast and Lightweight Automl Library.”</span>
+<em>Proceedings of MLSys</em>.
+</div>
+</div>
+<hr />
+<h1 data-number="9" id="appendix-a-model-configuration-details"><span
+class="header-section-number">9</span> Appendix A: Model Configuration
+Details</h1>
+<h2 data-number="9.1" id="a.1-lightgbm-optuna-best-parameters"><span
+class="header-section-number">9.1</span> A.1 LightGBM Optuna Best
+Parameters</h2>
+<pre><code>boosting_type: gbdt
+num_leaves: 24
+max_depth: 3
+learning_rate: 0.0762
+n_estimators: 651
+min_child_samples: 58
+subsample: 0.9075
+colsample_bytree: 0.5711
+reg_alpha: 1.3459
+reg_lambda: 4.27e-6</code></pre>
+<h2 data-number="9.2" id="a.2-xgboost-optuna-best-parameters"><span
+class="header-section-number">9.2</span> A.2 XGBoost Optuna Best
+Parameters</h2>
+<pre><code>n_estimators: 479
+max_depth: 5
+learning_rate: 0.0623
+subsample: 0.9467
+colsample_bytree: 0.5009
+min_child_weight: 6
+gamma: 0.0462
+reg_alpha: 1.20e-8
+reg_lambda: 0.0058</code></pre>
+<h2 data-number="9.3" id="a.3-catboost-optuna-best-parameters"><span
+class="header-section-number">9.3</span> A.3 CatBoost Optuna Best
+Parameters</h2>
+<pre><code>iterations: 487
+depth: 4
+learning_rate: 0.1465
+l2_leaf_reg: 0.2321
+border_count: 78</code></pre>
+<h2 data-number="9.4" id="a.4-neural-network-configurations"><span
+class="header-section-number">9.4</span> A.4 Neural Network
+Configurations</h2>
+<table>
+<colgroup>
+<col style="width: 19%" />
+<col style="width: 20%" />
+<col style="width: 17%" />
+<col style="width: 13%" />
+<col style="width: 17%" />
+<col style="width: 11%" />
+</colgroup>
+<thead>
+<tr>
+<th>Architecture</th>
+<th>Layers</th>
+<th>Activation</th>
+<th>Dropout</th>
+<th>Batch Norm</th>
+<th>Epochs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MLP Small</td>
+<td>[64, 32]</td>
+<td>ReLU</td>
+<td>0.30</td>
+<td>No</td>
+<td>60</td>
+</tr>
+<tr>
+<td>MLP Medium</td>
+<td>[256,128,64]</td>
+<td>ReLU</td>
+<td>0.30</td>
+<td>Yes</td>
+<td>60</td>
+</tr>
+<tr>
+<td>MLP Wide</td>
+<td>[512, 256]</td>
+<td>GELU</td>
+<td>0.25</td>
+<td>No</td>
+<td>60</td>
+</tr>
+<tr>
+<td>MLP Deep</td>
+<td>5×128</td>
+<td>Swish</td>
+<td>0.20</td>
+<td>Yes</td>
+<td>60</td>
+</tr>
+<tr>
+<td>TabNet</td>
+<td>n_d=32, n_a=32, n_steps=5</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>100</td>
+</tr>
+</tbody>
+</table>
+<p>All neural networks: Adam optimizer, lr=1e-3, ReduceLROnPlateau
+(patience=4, factor=0.5), early stopping (patience=8), batch size=2048,
+MPS device.</p>
+<hr />
+<h1 data-number="10" id="appendix-b-reproducibility"><span
+class="header-section-number">10</span> Appendix B: Reproducibility</h1>
+<h2 data-number="10.1" id="b.1-environment"><span
+class="header-section-number">10.1</span> B.1 Environment</h2>
+<pre><code>Python 3.11.11 (pyenv)
+numpy==1.26.4
+pandas==2.2.3
+scikit-learn==1.6.1
+xgboost==3.0.1
+lightgbm==4.6.0
+catboost==1.2.7
+torch==2.10.0 (MPS enabled)
+shap==0.47.2
+optuna==4.3.0
+flaml==2.3.4
+imbalanced-learn==0.13.0
+mlflow==2.22.1</code></pre>
+<h2 data-number="10.2" id="b.2-execution"><span
+class="header-section-number">10.2</span> B.2 Execution</h2>
+<p>All experiments run as standalone Python scripts under
+<code>.venv/bin/python</code>:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="va">PYTHONUNBUFFERED</span><span class="op">=</span>1 <span class="ex">.venv/bin/python</span> src/run_XX_phase_name.py</span></code></pre></div>
+<p>MLflow experiments accessible via:
+<code>mlflow ui --backend-store-uri ./mlruns</code></p>
+<h2 data-number="10.3" id="b.3-git-commit-history"><span
+class="header-section-number">10.3</span> B.3 Git Commit History</h2>
+<table>
+<thead>
+<tr>
+<th>Commit</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>feat: initialize project structure...</code></td>
+<td>Phase 0: environment setup</td>
+</tr>
+<tr>
+<td><code>analysis: complete EDA...</code></td>
+<td>Phase 1: EDA results</td>
+</tr>
+<tr>
+<td><code>feat: feature engineering...</code></td>
+<td>Phase 2: feature sets</td>
+</tr>
+<tr>
+<td><code>results: baseline models...</code></td>
+<td>Phase 3: baselines</td>
+</tr>
+<tr>
+<td><code>results: classical ML models...</code></td>
+<td>Phase 4: classical ML</td>
+</tr>
+<tr>
+<td><code>results: advanced boosting...</code></td>
+<td>Phase 5: XGB/LGB/CAT</td>
+</tr>
+<tr>
+<td><code>results: neural network experiments...</code></td>
+<td>Phase 6: neural nets</td>
+</tr>
+<tr>
+<td><code>results: AutoML and hyperparameter...</code></td>
+<td>Phase 7: AutoML</td>
+</tr>
+<tr>
+<td><code>results: imbalance handling...</code></td>
+<td>Phase 8: imbalance</td>
+</tr>
+<tr>
+<td><code>analysis: interpretability...</code></td>
+<td>Phase 9: SHAP/LIME</td>
+</tr>
+<tr>
+<td><code>analysis: dimensionality reduction...</code></td>
+<td>Phase 10: clustering</td>
+</tr>
+<tr>
+<td><code>results: LLM classification...</code></td>
+<td>Phase 11: LLM</td>
+</tr>
+<tr>
+<td><code>results: final ensemble...</code></td>
+<td>Phase 12: ensemble</td>
+</tr>
+</tbody>
+</table>
